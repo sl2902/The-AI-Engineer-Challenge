@@ -2,19 +2,21 @@
 
 This backend is a FastAPI application providing an API to interact with OpenAI's chat completion service.
 
+Install uv from [here](https://docs.astral.sh/uv/reference/installer/)
+
 ## Setup and Installation
 
 1. Create a Python virtual environment and activate it:
 
 ```bash
-python3 -m venv .venv
+uv venv --python 3.13
 source .venv/bin/activate
 ```
 
 2. Install dependencies:
 
 ```bash
-pip install -r requirements.txt
+uv pip install -r pyproject.toml
 ```
 
 3. Set your OpenAI API key as an environment variable:
