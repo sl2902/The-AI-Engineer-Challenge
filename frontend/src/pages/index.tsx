@@ -1,7 +1,7 @@
 import Head from "next/head";
 import { Geist, Geist_Mono } from "next/font/google";
 import styles from "@/styles/Home.module.css";
-import { useState } from "react";
+import { useState } from "react"; // Remove FormEvent if not used
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,31 +14,47 @@ const geistMono = Geist_Mono({
 });
 
 export default function Home() {
+  const [apiKey, setApiKey] = useState("");
   const [developerMessage, setDeveloperMessage] = useState("");
   const [userMessage, setUserMessage] = useState("");
   const [responseText, setResponseText] = useState("");
   const [loading, setLoading] = useState(false);
+  const [invalidApiKey, setInvalidApiKey] = useState(false);
 
+  // ← The function needs to be HERE, inside the component
   const callChatAPI = async () => {
+    setInvalidApiKey(false); // Reset error state
+    if (!apiKey) {
+      alert("OpenAI API key is required!");
+      return;
+    }
+
     setLoading(true);
     setResponseText("");
 
     try {
-      const response = await fetch("http://localhost:8000/api/chat", {
+      const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           developer_message: developerMessage,
           user_message: userMessage,
-          model: "gpt-4.1-mini",
+          model: "gpt-4o-mini",
+          api_key: apiKey,
         }),
       });
+
+      if (response.status === 401 || response.status === 403) {
+        alert("Invalid API key. Please check and try again.");
+        setInvalidApiKey(true);
+        setResponseText("");
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(`Server error: ${response.status}`);
       }
 
-      // Stream the response text
       const reader = response.body?.getReader();
       if (!reader) {
         throw new Error('ReadableStream not supported in this browser.');
@@ -56,8 +72,7 @@ export default function Home() {
         }
       }
     } catch (error) {
-      // @ts-ignore
-      setResponseText(`Error: ${error.message}`);
+      setResponseText(`Error: ${(error as Error).message}`);
     } finally {
       setLoading(false);
     }
@@ -65,55 +80,72 @@ export default function Home() {
 
   return (
     <>
-      <Head>
-        <title>The AI Engineer Challenge</title>
-        <meta name="description" content="Build modern AI powered apps with ease." />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-      </Head>
-      <div className={`${styles.page} ${geistSans.variable} ${geistMono.variable}`}> 
-        <main className={styles.main}>
-          <h1 className={styles.title}>The AI Engineer Challenge</h1>
+    <Head>
+      <title>The AI Engineer Challenge</title>
+      <meta name="description" content="Build modern AI powered apps with ease." />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+    </Head>
+    <div className={`${styles.page} ${geistSans.variable} ${geistMono.variable}`}> 
+      <main className={styles.main}>
+        <h1 className={styles.title}>The AI Engineer Challenge</h1>
 
-          <label htmlFor="developerMessage" className={styles.label}>
-            Developer Message
-          </label>
-          <textarea
-            id="developerMessage"
-            className={styles.textarea}
-            value={developerMessage}
-            onChange={(e) => setDeveloperMessage(e.target.value)}
-            rows={3}
-            placeholder="Enter developer message here"
-          />
+        <label htmlFor="apiKey" className={styles.label}>
+          OpenAI API Key
+        </label>
+        <input
+          id="apiKey"
+          type="password"
+          className={styles.textarea}
+          value={apiKey}
+          onChange={(e) => setApiKey(e.target.value)}
+          placeholder="Paste your OpenAI API key"
+        />
 
-          <label htmlFor="userMessage" className={styles.label}>
-            User Message
-          </label>
-          <textarea
-            id="userMessage"
-            className={styles.textarea}
-            value={userMessage}
-            onChange={(e) => setUserMessage(e.target.value)}
-            rows={3}
-            placeholder="Enter user message here"
-          />
+        <label htmlFor="developerMessage" className={styles.label}>
+          Developer Message
+        </label>
+        <textarea
+          id="developerMessage"
+          className={styles.textarea}
+          value={developerMessage}
+          onChange={(e) => setDeveloperMessage(e.target.value)}
+          rows={3}
+          placeholder="Enter developer message here"
+        />
 
-          <button
-            className={styles.primaryButton}
-            onClick={callChatAPI}
-            disabled={loading || !userMessage}
-          >
-            {loading ? "Loading..." : "Send"}
-          </button>
+        <label htmlFor="userMessage" className={styles.label}>
+          User Message
+        </label>
+        <textarea
+          id="userMessage"
+          className={styles.textarea}
+          value={userMessage}
+          onChange={(e) => setUserMessage(e.target.value)}
+          rows={3}
+          placeholder="Enter user message here"
+        />
 
-          <div className={styles.response}>
-            <h2>Response:</h2>
-            <div>{responseText.split('\n').map((line, idx) => (
-              <p key={idx} style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{line}</p>
-            ))}</div>
-          </div>
-        </main>
-      </div>
-    </>
+        <button
+          className={styles.primaryButton}
+          onClick={callChatAPI}
+          disabled={loading || !userMessage}
+        >
+          {loading ? "Loading..." : "Send"}
+        </button>
+
+        <div className={styles.response}>
+          {invalidApiKey && (
+            <p style={{ color: "red", fontWeight: "bold" }}>
+              Invalid API key. Please check and try again.
+            </p>
+          )}
+          <h2>Response:</h2>
+          <div>{responseText.split('\n').map((line, idx) => (
+            <p key={idx} style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{line}</p>
+          ))}</div>
+        </div>
+      </main>
+    </div>
+  </>
   );
 }
