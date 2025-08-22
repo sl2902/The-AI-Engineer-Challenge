@@ -8,9 +8,13 @@ from pydantic import BaseModel
 from openai import OpenAI
 import os
 from typing import Optional
+from dotenv import load_dotenv
+load_dotenv()
 
 # Initialize FastAPI application with a title
 app = FastAPI(title="OpenAI Chat API")
+
+api_key = os.getenv("OPENAI_API_KEY")
 
 # Configure CORS (Cross-Origin Resource Sharing) middleware
 # This allows the API to be accessed from different domains/origins
@@ -28,14 +32,14 @@ class ChatRequest(BaseModel):
     developer_message: str  # Message from the developer/system
     user_message: str      # Message from the user
     model: Optional[str] = "gpt-4.1-mini"  # Optional model selection with default
-    api_key: str          # OpenAI API key for authentication
+    # api_key: str          # OpenAI API key for authentication
 
 # Define the main chat endpoint that handles POST requests
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
     try:
         # Initialize OpenAI client with the provided API key
-        client = OpenAI(api_key=request.api_key)
+        client = OpenAI(api_key=api_key)
         
         # Create an async generator function for streaming responses
         async def generate():
@@ -65,6 +69,13 @@ async def chat(request: ChatRequest):
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok"}
+
+
+# Add handler for /v1/models to return empty list instead of 404
+@app.get("/v1/models")
+async def models_handler():
+    return {"data": [], "object": "list"}
+
 
 # Entry point for running the application directly
 if __name__ == "__main__":
