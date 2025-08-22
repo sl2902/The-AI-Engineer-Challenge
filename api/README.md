@@ -1,76 +1,80 @@
-# OpenAI Chat API Backend
+# Backend - OpenAI Chat API
 
-This is a FastAPI-based backend service that provides a streaming chat interface using OpenAI's API.
+This backend is a FastAPI application providing an API to interact with OpenAI's chat completion service.
 
-## Prerequisites
+## Setup and Installation
 
-- Python 3.8 or higher
-- pip (Python package manager)
-- An OpenAI API key
+1. Create a Python virtual environment and activate it:
 
-## Setup
-
-1. Create a virtual environment (recommended):
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows, use: venv\Scripts\activate
+python3 -m venv .venv
+source .venv/bin/activate
 ```
 
-2. Install the required dependencies:
+2. Install dependencies:
+
 ```bash
-pip install fastapi uvicorn openai pydantic
+pip install -r requirements.txt
 ```
 
-## Running the Server
+3. Set your OpenAI API key as an environment variable:
 
-1. Make sure you're in the `api` directory:
 ```bash
-cd api
+export OPENAI_API_KEY=your_api_key_here
 ```
 
-2. Start the server:
-```bash
-python app.py
+Alternatively, create a `.env` file in the `api` folder with:
+
+```
+OPENAI_API_KEY=your_api_key_here
 ```
 
-The server will start on `http://localhost:8000`
+## Running the Backend Locally
 
-## API Endpoints
+Start the FastAPI server with:
 
-### Chat Endpoint
-- **URL**: `/api/chat`
-- **Method**: POST
-- **Request Body**:
+```bash
+uvicorn app:app --host 0.0.0.0 --port 8000
+```
+
+The backend will be accessible at `http://localhost:8000`.
+
+## API Endpoint
+
+### POST `/api/chat`
+
+Send chat messages to the backend for processing by OpenAI.
+
+#### Request JSON Body
+
 ```json
 {
-    "developer_message": "string",
-    "user_message": "string",
-    "model": "gpt-4.1-mini",  // optional
-    "api_key": "your-openai-api-key"
+  "developer_message": "string",
+  "user_message": "string",
+  "model": "string", // optional, default: "gpt-4.1-mini"
+  "api_key": "string" // Your OpenAI API key, required
 }
 ```
-- **Response**: Streaming text response
 
-### Health Check
-- **URL**: `/api/health`
-- **Method**: GET
-- **Response**: `{"status": "ok"}`
+#### Response
 
-## API Documentation
+Streamed chat completion text as plain text.
 
-Once the server is running, you can access the interactive API documentation at:
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
+#### Errors
 
-## CORS Configuration
+- Returns HTTP 401 if the OpenAI API key is invalid.
+- Returns HTTP 500 for other server errors.
 
-The API is configured to accept requests from any origin (`*`). This can be modified in the `app.py` file if you need to restrict access to specific domains.
+## CORS
 
-## Error Handling
+The backend allows CORS from all origins for development flexibility.
 
-The API includes basic error handling for:
-- Invalid API keys
-- OpenAI API errors
-- General server errors
+## Deployment
 
-All errors will return a 500 status code with an error message. 
+- Ensure the environment variable `OPENAI_API_KEY` is set in your deployment environment or provide the API key in request.
+
+- The backend can be deployed separately or integrated as serverless functions.
+
+---
+
+Feel free to customize and extend this backend API as needed for your AI Engineer Challenge project!
