@@ -32,14 +32,14 @@ class ChatRequest(BaseModel):
     developer_message: str  # Message from the developer/system
     user_message: str      # Message from the user
     model: Optional[str] = "gpt-4.1-mini"  # Optional model selection with default
-    # api_key: str          # OpenAI API key for authentication
+    api_key: str          # OpenAI API key for authentication
 
 # Define the main chat endpoint that handles POST requests
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
     try:
         # Initialize OpenAI client with the provided API key
-        client = OpenAI(api_key=api_key)
+        client = OpenAI(api_key=request.api_key)
         
         # Create an async generator function for streaming responses
         async def generate():
@@ -62,8 +62,10 @@ async def chat(request: ChatRequest):
         return StreamingResponse(generate(), media_type="text/plain")
     
     except Exception as e:
-        # Handle any errors that occur during processing
-        raise HTTPException(status_code=500, detail=str(e))
+        error_message = str(e)
+        if "authentication" in error_message.lower() or "invalid" in error_message.lower():
+            raise HTTPException(status_code=401, detail="Invalid API key")
+        raise HTTPException(status_code=500, detail=error_message)
 
 # Define a health check endpoint to verify API status
 @app.get("/api/health")
