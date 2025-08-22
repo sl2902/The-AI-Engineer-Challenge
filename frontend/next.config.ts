@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/v1/:path*",
-        destination: "https://api.openai.com/v1/:path*",
+        destination: "http://localhost:8000/api/:path*",
       },
     ];
   },
