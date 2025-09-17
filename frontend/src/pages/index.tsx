@@ -3,6 +3,24 @@ import { Geist, Geist_Mono } from "next/font/google";
 import styles from "@/styles/Home.module.css";
 import React, { useState, useEffect } from "react";
 
+// TypeScript interfaces
+interface UploadResult {
+  success: boolean;
+  message: string;
+  chunks_processed?: number;
+  filename?: string;
+}
+
+interface SearchResult {
+  text: string;
+  score: number;
+  metadata: {
+    source: string;
+    chunk_index: number;
+    [key: string]: unknown;
+  };
+}
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -22,7 +40,7 @@ export default function Home() {
   const [invalidApiKey, setInvalidApiKey] = useState(false);
   
   // PDF Upload state
-  const [uploadResult, setUploadResult] = useState<any>(null);
+  const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const [uploadError, setUploadError] = useState("");
   const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "processing" | "chunking" | "ingesting" | "success" | "error">("idle");
   const [activeTab, setActiveTab] = useState<"chat" | "pdf" | "search" | "rag">("chat");
@@ -35,7 +53,7 @@ export default function Home() {
   
   // Vector Search state
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [availableSources, setAvailableSources] = useState<string[]>([]);
   const [selectedSource, setSelectedSource] = useState<string>("");
   const [distanceMetric, setDistanceMetric] = useState<string>("cosine_similarity");
@@ -109,7 +127,7 @@ export default function Home() {
   };
 
   // PDF Upload handlers
-  const handleUploadSuccess = (result: any) => {
+  const handleUploadSuccess = (result: UploadResult) => {
     setUploadResult(result);
     setUploadError("");
     setUploadStatus("success");
