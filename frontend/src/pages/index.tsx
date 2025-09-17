@@ -37,7 +37,7 @@ export default function Home() {
   const [userMessage, setUserMessage] = useState("");
   const [responseText, setResponseText] = useState("");
   const [loading, setLoading] = useState(false);
-  const [invalidApiKey, setInvalidApiKey] = useState(false);
+  // const [invalidApiKey, setInvalidApiKey] = useState(false); // Unused
   
   // PDF Upload state
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
@@ -231,11 +231,11 @@ export default function Home() {
         try {
           const errorData = await response.json();
           errorMessage = errorData.error || errorData.detail || errorMessage;
-        } catch (parseError) {
+        } catch {
           try {
             const errorText = await response.text();
             errorMessage = errorText || errorMessage;
-          } catch (textError) {
+          } catch {
             errorMessage = `HTTP ${response.status}: ${response.statusText}`;
           }
         }
@@ -338,11 +338,11 @@ export default function Home() {
         try {
           const errorData = await response.json();
           errorMessage = errorData.error || errorData.detail || errorMessage;
-        } catch (parseError) {
+        } catch {
           try {
             const errorText = await response.text();
             errorMessage = errorText || errorMessage;
-          } catch (textError) {
+          } catch {
             errorMessage = `HTTP ${response.status}: ${response.statusText}`;
           }
         }
@@ -394,12 +394,12 @@ export default function Home() {
         try {
           const errorData = await response.json();
           errorMessage = errorData.detail || errorData.error || errorMessage;
-        } catch (parseError) {
+        } catch {
           // If JSON parsing fails, try to get text
           try {
             const errorText = await response.text();
             errorMessage = errorText || errorMessage;
-          } catch (textError) {
+          } catch {
             errorMessage = `HTTP ${response.status}: ${response.statusText}`;
           }
         }

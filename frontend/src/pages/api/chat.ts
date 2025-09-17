@@ -89,7 +89,7 @@ export default async function handler(
               if (content) {
                 res.write(content);
               }
-            } catch (e) {
+            } catch {
               // Skip invalid JSON
             }
           }

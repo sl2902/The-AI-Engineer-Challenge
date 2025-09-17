@@ -1,17 +1,16 @@
 import React, { useState, useRef } from 'react';
 
-interface PDFUploadProps {
-  apiKey: string;
-  onUploadSuccess: (result: any) => void;
-  onUploadError: (error: string) => void;
-}
-
 interface UploadResult {
   success: boolean;
   message: string;
-  filename: string;
-  chunks_processed: number;
-  total_characters: number;
+  chunks_processed?: number;
+  filename?: string;
+}
+
+interface PDFUploadProps {
+  apiKey: string;
+  onUploadSuccess: (result: UploadResult) => void;
+  onUploadError: (error: string) => void;
 }
 
 const PDFUpload: React.FC<PDFUploadProps> = ({ apiKey, onUploadSuccess, onUploadError }) => {
