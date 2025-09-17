@@ -185,17 +185,19 @@ export default function Home() {
     }
     setErrorCountdown(0);
     
+    // Check file size (4MB limit for Vercel)
+    const maxSize = 4 * 1024 * 1024; // 4MB in bytes
+    if (file.size > maxSize) {
+      handleUploadError(`❌ File too large. Maximum size is 4MB. Your file is ${(file.size / 1024 / 1024).toFixed(1)}MB`);
+      return;
+    }
+    
     // Validate file type
     if (!file.name.toLowerCase().endsWith('.pdf')) {
       handleUploadError('❌ Please select a PDF file. Only .pdf files are supported.');
       return;
     }
 
-    // Validate file size (10MB limit)
-    if (file.size > 10 * 1024 * 1024) {
-      handleUploadError('❌ File too large. Please select a PDF file smaller than 10MB.');
-      return;
-    }
 
     if (!apiKey) {
       handleUploadError('❌ OpenAI API key is required for PDF processing');
@@ -547,6 +549,7 @@ export default function Home() {
             <div className="tab-content">
               <div className="pdf-upload-container">
                 <h3>Upload PDF Document</h3>
+                <p className="file-size-info">📏 Maximum file size: 4MB (Vercel limit)</p>
                 
                 {/* Chunking Configuration */}
                 <div className="chunking-config">
@@ -989,6 +992,13 @@ export default function Home() {
           margin: 0 0 15px 0;
           color: #333;
           font-size: 18px;
+        }
+
+        .file-size-info {
+          margin: 0 0 15px 0;
+          color: #666;
+          font-size: 14px;
+          font-style: italic;
         }
 
         .chunking-config {
