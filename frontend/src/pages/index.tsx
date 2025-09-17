@@ -9,6 +9,7 @@ interface UploadResult {
   message: string;
   chunks_processed?: number;
   filename?: string;
+  total_characters?: number;
 }
 
 interface SearchResult {
