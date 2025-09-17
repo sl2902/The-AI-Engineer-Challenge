@@ -277,15 +277,26 @@ async def get_api_key():
         import os
         api_key = os.getenv("OPENAI_API_KEY")
         
+        # Debug: Log environment info (without exposing the actual key)
+        env_vars = {k: v for k, v in os.environ.items() if 'OPENAI' in k.upper()}
+        
         if api_key:
             return {
                 "success": True,
-                "api_key": api_key
+                "api_key": api_key,
+                "debug": {
+                    "env_vars_found": list(env_vars.keys()),
+                    "key_length": len(api_key) if api_key else 0
+                }
             }
         else:
             return {
                 "success": False,
-                "message": "No API key found in environment variables"
+                "message": "No API key found in environment variables",
+                "debug": {
+                    "env_vars_found": list(env_vars.keys()),
+                    "all_env_vars": list(os.environ.keys())[:10]  # First 10 env vars for debugging
+                }
             }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get API key: {str(e)}")

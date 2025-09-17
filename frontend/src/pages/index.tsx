@@ -285,18 +285,20 @@ export default function Home() {
       const response = await fetch('/api/get-api-key');
       if (response.ok) {
         const data = await response.json();
-        if (data.api_key) {
+        if (data.success && data.api_key) {
           setApiKey(data.api_key);
           alert('API key loaded from environment successfully!');
         } else {
-          alert('No API key found in environment variables.');
+          const debugInfo = data.debug ? `\nDebug info: ${JSON.stringify(data.debug, null, 2)}` : '';
+          alert(`No API key found in environment variables.${debugInfo}`);
         }
       } else {
-        alert('Failed to fetch API key from environment.');
+        const errorText = await response.text();
+        alert(`Failed to load API key from environment. Status: ${response.status}\nError: ${errorText}`);
       }
     } catch (error) {
       console.error('Failed to fetch API key:', error);
-      alert('Failed to fetch API key from environment.');
+      alert(`Error loading API key from environment: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
