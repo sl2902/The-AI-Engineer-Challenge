@@ -67,7 +67,7 @@
   overflow-y: auto;
   word-break: break-word;
   overflow-wrap: anywhere;
-  font-family: var(--font-geist-mono);
+  font-family: var(--font-geist-sans);
   font-size: 15px;
   line-height: 1.4;
   border: 1px solid #dadada;
