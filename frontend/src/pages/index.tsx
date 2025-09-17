@@ -650,7 +650,7 @@ export default function Home() {
                     <h4>✅ Upload Successful!</h4>
                     <p><strong>File:</strong> {uploadResult.filename}</p>
                     <p><strong>Chunks processed:</strong> {uploadResult.chunks_processed}</p>
-                    <p><strong>Total characters:</strong> {uploadResult.total_characters.toLocaleString()}</p>
+                    <p><strong>Total characters:</strong> {uploadResult.total_characters?.toLocaleString() || 'N/A'}</p>
                     <p><strong>Message:</strong> {uploadResult.message}</p>
                   </div>
                 )}
