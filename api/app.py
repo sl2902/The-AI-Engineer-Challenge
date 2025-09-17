@@ -1,5 +1,5 @@
 # Import required FastAPI components for building the API
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 # Import Pydantic for data validation and settings management
@@ -7,14 +7,30 @@ from pydantic import BaseModel
 # Import OpenAI client for interacting with OpenAI's API
 from openai import OpenAI
 import os
+import sys
 from typing import Optional
 from dotenv import load_dotenv
+
+# Add the parent directory to the path to import aimakerspace modules
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from aimakerspace.pdf_utils import create_pdf_processor
+from aimakerspace.vectordatabase import VectorDatabase, cosine_similarity, euclidean_distance, manhattan_distance
+from aimakerspace.rag_pipeline import create_rag_pipeline
+import asyncio
+
 load_dotenv()
 
 # Initialize FastAPI application with a title
 app = FastAPI(title="OpenAI Chat API")
 
 api_key = os.getenv("OPENAI_API_KEY")
+
+# Initialize global vector database instance
+vector_db = VectorDatabase()
+
+# Initialize RAG pipeline
+rag_pipeline = create_rag_pipeline(vector_db, model_name="gpt-4o-mini", streaming=True)
 
 # Configure CORS (Cross-Origin Resource Sharing) middleware
 # This allows the API to be accessed from different domains/origins
@@ -33,6 +49,42 @@ class ChatRequest(BaseModel):
     user_message: str      # Message from the user
     model: Optional[str] = "gpt-4.1-mini"  # Optional model selection with default
     api_key: str          # OpenAI API key for authentication
+
+# Define response models for PDF upload
+class PDFUploadResponse(BaseModel):
+    success: bool
+    message: str
+    filename: str
+    chunks_processed: int
+    total_characters: int
+
+class VectorDBSearchRequest(BaseModel):
+    query: str
+    k: int = 5
+    api_key: str
+    source_filter: Optional[str] = None
+    distance_metric: Optional[str] = "cosine_similarity"
+
+class VectorDBSearchResponse(BaseModel):
+    results: list
+    total_results: int
+
+
+class RAGRequest(BaseModel):
+    query: str
+    k: int = 5
+    api_key: str
+    source_filter: Optional[str] = None
+    distance_metric: Optional[str] = "cosine_similarity"
+    include_context: bool = False
+    stream: bool = False
+
+class RAGResponse(BaseModel):
+    response: str
+    query: str
+    context: Optional[str] = None
+    retrieved_results: Optional[list] = None
+    num_context_chunks: Optional[int] = None
 
 # Define the main chat endpoint that handles POST requests
 @app.post("/api/chat")
@@ -63,9 +115,250 @@ async def chat(request: ChatRequest):
     
     except Exception as e:
         error_message = str(e)
-        if "authentication" in error_message.lower() or "invalid" in error_message.lower():
+        if "authentication" in error_message.lower() or \
+            "invalid" in error_message.lower() or \
+            "unauthorized" in error_message.lower():
             raise HTTPException(status_code=401, detail="Invalid API key")
         raise HTTPException(status_code=500, detail=error_message)
+
+# Define PDF upload endpoint
+@app.post("/api/upload-pdf", response_model=PDFUploadResponse)
+async def upload_pdf(
+    file: UploadFile = File(...),
+    api_key: str = Form(...),
+    chunk_size: int = Form(1000),
+    chunk_overlap: int = Form(200)
+):
+    """
+    Upload and process a PDF file, extracting text and storing it in the vector database.
+    
+    Args:
+        file: The PDF file to upload
+        api_key: OpenAI API key for authentication
+        chunk_size: Size of text chunks (default: 1000)
+        chunk_overlap: Overlap between chunks (default: 200)
+    
+    Returns:
+        PDFUploadResponse with processing results
+    """
+    try:
+        # Validate file type
+        if not file.filename.lower().endswith('.pdf'):
+            raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+        
+        # Read file content
+        file_content = await file.read()
+        
+        if len(file_content) == 0:
+            raise HTTPException(status_code=400, detail="Empty file uploaded")
+        
+        # Initialize PDF processor
+        pdf_processor = create_pdf_processor(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+        
+        # Process PDF
+        result = pdf_processor.process_pdf(file_content, file.filename)
+        
+        # Add chunks to vector database
+        await vector_db.abuild_from_list(
+            result["chunks"], 
+            source_name="PDF",
+            source_type="text"
+        )
+        
+        return PDFUploadResponse(
+            success=True,
+            message=f"Successfully processed PDF: {file.filename}",
+            filename=file.filename,
+            chunks_processed=result["metadata"]["total_chunks"],
+            total_characters=result["metadata"]["total_characters"]
+        )
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"PDF processing failed: {str(e)}")
+
+# Define vector database search endpoint
+@app.post("/api/search-vectors", response_model=VectorDBSearchResponse)
+async def search_vectors(request: VectorDBSearchRequest):
+    """
+    Search the vector database for similar content.
+    
+    Args:
+        request: Search request with query, k, and optional source filter
+    
+    Returns:
+        VectorDBSearchResponse with search results
+    """
+    try:
+        # Build metadata filter if source is specified
+        metadata_filter = None
+        if request.source_filter:
+            metadata_filter = {"source": request.source_filter}
+            print(f"Filtering by source: {request.source_filter}")
+        else:
+            print("No source filter - searching all sources")
+        
+        # Select distance measure function
+        distance_measure = cosine_similarity  # default
+        if request.distance_metric == "euclidean_distance":
+            distance_measure = euclidean_distance
+        elif request.distance_metric == "manhattan_distance":
+            distance_measure = manhattan_distance
+        
+        print(f"Using distance metric: {request.distance_metric} -> {distance_measure.__name__}")
+        print(f"Search query: '{request.query}', k={request.k}")
+        
+        # Perform search
+        results = vector_db.search_by_text(
+            query_text=request.query,
+            k=request.k,
+            metadata_filter=metadata_filter,
+            include_metadata=True,
+            distance_measure=distance_measure
+        )
+        
+        # Format results for response
+        formatted_results = []
+        sources_found = set()
+        for text, score, metadata in results:
+            formatted_results.append({
+                "text": text,
+                "score": score,
+                "metadata": metadata
+            })
+            sources_found.add(metadata.get("source", "unknown"))
+        
+        print(f"Found {len(formatted_results)} results from sources: {list(sources_found)}")
+        
+        return VectorDBSearchResponse(
+            results=formatted_results,
+            total_results=len(formatted_results)
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Vector search failed: {str(e)}")
+
+# Define endpoint to get vector database summary
+@app.get("/api/vector-db-summary")
+async def get_vector_db_summary():
+    """
+    Get a summary of the current vector database contents.
+    
+    Returns:
+        Dictionary with database summary information
+    """
+    try:
+        summary = vector_db.get_metadata_summary()
+        return {
+            "success": True,
+            "summary": summary,
+            "performance": {
+                "total_vectors": len(vector_db.vectors),
+                "ann_enabled": False,
+                "index_type": "basic",
+                "index_trained": True,
+                "memory_usage_estimate": len(vector_db.vectors) * 1536 * 4
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get database summary: {str(e)}")
+
+# Define endpoint to get API key from environment
+@app.get("/api/get-api-key")
+async def get_api_key():
+    """
+    Get the OpenAI API key from environment variables.
+    
+    Returns:
+        Dict with the API key if found in environment
+    """
+    try:
+        import os
+        api_key = os.getenv("OPENAI_API_KEY")
+        
+        if api_key:
+            return {
+                "success": True,
+                "api_key": api_key
+            }
+        else:
+            return {
+                "success": False,
+                "message": "No API key found in environment variables"
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get API key: {str(e)}")
+
+
+# Define RAG endpoint
+@app.post("/api/rag")
+async def rag_query(request: RAGRequest):
+    """
+    Perform RAG (Retrieval-Augmented Generation) query.
+    
+    Args:
+        request: RAG request with query and parameters
+    
+    Returns:
+        RAGResponse with generated answer and optional context
+    """
+    try:
+        # Select distance measure function
+        distance_measure = cosine_similarity  # default
+        if request.distance_metric == "euclidean_distance":
+            distance_measure = euclidean_distance
+        elif request.distance_metric == "manhattan_distance":
+            distance_measure = manhattan_distance
+        
+        # Build metadata filter if source is specified
+        metadata_filter = None
+        if request.source_filter:
+            metadata_filter = {"source": request.source_filter}
+        
+        print(f"RAG Query: '{request.query}', k={request.k}, distance={request.distance_metric}")
+        
+        # Perform RAG query
+        result = await rag_pipeline.rag_query(
+            query=request.query,
+            k=request.k,
+            distance_measure=distance_measure,
+            metadata_filter=metadata_filter,
+            stream=request.stream,
+            include_context=request.include_context
+        )
+        
+        if request.stream:
+            # For streaming, return a generator
+            async def generate():
+                async for chunk_data in result["response_generator"]:
+                    yield f"data: {chunk_data}\n\n"
+                yield "data: [DONE]\n\n"
+            
+            return StreamingResponse(generate(), media_type="text/plain")
+        else:
+            return RAGResponse(**result)
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"RAG query failed: {str(e)}")
+
+# Define RAG stats endpoint
+@app.get("/api/rag-stats")
+async def get_rag_stats():
+    """
+    Get RAG pipeline statistics.
+    
+    Returns:
+        Dictionary with RAG pipeline statistics
+    """
+    try:
+        stats = rag_pipeline.get_rag_stats()
+        return {
+            "success": True,
+            "stats": stats
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get RAG stats: {str(e)}")
 
 # Define a health check endpoint to verify API status
 @app.get("/api/health")
