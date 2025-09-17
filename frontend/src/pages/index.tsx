@@ -70,7 +70,6 @@ export default function Home() {
 
   // ← The function needs to be HERE, inside the component
   const callChatAPI = async () => {
-    setInvalidApiKey(false); // Reset error state
     if (!apiKey) {
       alert("OpenAI API key is required!");
       return;
@@ -93,7 +92,6 @@ export default function Home() {
 
       if (response.status === 401 || response.status === 403) {
         alert("Invalid API key. Please check and try again.");
-        setInvalidApiKey(true);
         setResponseText("");
         return;
       }
