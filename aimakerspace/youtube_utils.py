@@ -1,9 +1,16 @@
-import yt_dlp
 from typing import List, Dict, Any
 from datetime import datetime
 import re
 import asyncio
 import concurrent.futures
+
+import subprocess
+import sys
+try:
+    import yt_dlp
+except ImportError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp"])
+    import yt_dlp
 
 class YouTubeTranscriptLoader:
     def __init__(self, language: str = "en"):
