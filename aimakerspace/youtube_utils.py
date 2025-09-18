@@ -8,6 +8,12 @@ import concurrent.futures
 class YouTubeTranscriptLoader:
     def __init__(self, language: str = "en"):
         self.language = language
+        # Log yt-dlp version for debugging
+        try:
+            import yt_dlp
+            print(f"yt-dlp version: {yt_dlp.version.__version__}")
+        except Exception as e:
+            print(f"Could not get yt-dlp version: {e}")
 
     def _run_with_timeout(self, func, timeout_seconds=30):
         """Run a function with a timeout to prevent hanging."""
@@ -109,6 +115,7 @@ class YouTubeTranscriptLoader:
         except Exception as e:
             error_msg = str(e)
             print(f"Exception in get_video_info: {error_msg}")
+            print(f"Full error details: {type(e).__name__}: {error_msg}")
             
             # Handle common YouTube errors
             if "bot" in error_msg.lower() or "captcha" in error_msg.lower() or "verify" in error_msg.lower():
@@ -118,7 +125,7 @@ class YouTubeTranscriptLoader:
             elif "age" in error_msg.lower() or "restricted" in error_msg.lower():
                 return {"valid": False, "video_id": video_id, "video_url": video_url, "error": "Video is age-restricted or region-blocked. Cannot access transcript."}
             elif "failed to extract any player response" in error_msg.lower() or "yt-dlp" in error_msg.lower():
-                return {"valid": False, "video_id": video_id, "video_url": video_url, "error": "YouTube API changed. Please try again later or contact support if the issue persists."}
+                return {"valid": False, "video_id": video_id, "video_url": video_url, "error": f"YouTube API issue detected. Full error: {error_msg}"}
             else:
                 return {"valid": False, "video_id": video_id, "video_url": video_url, "error": f"YouTube access error: {error_msg}"}
 
