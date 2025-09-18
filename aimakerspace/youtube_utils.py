@@ -11,9 +11,22 @@ class YouTubeTranscriptLoader:
         # Log yt-dlp version for debugging
         try:
             import yt_dlp
-            print(f"yt-dlp version: {yt_dlp.version.__version__}")
+            current_version = yt_dlp.version.__version__
+            print(f"yt-dlp version: {current_version}")
+            
+            # Check if we need to upgrade (this is just for logging)
+            if current_version < "2024.12.0":
+                print(f"WARNING: yt-dlp version {current_version} may be outdated. Consider upgrading to latest version.")
         except Exception as e:
             print(f"Could not get yt-dlp version: {e}")
+        
+        # Test basic YouTube connectivity
+        try:
+            import requests
+            response = requests.get("https://www.youtube.com", timeout=5)
+            print(f"YouTube connectivity test: {response.status_code}")
+        except Exception as e:
+            print(f"YouTube connectivity test failed: {e}")
 
     def _run_with_timeout(self, func, timeout_seconds=30):
         """Run a function with a timeout to prevent hanging."""
@@ -83,29 +96,57 @@ class YouTubeTranscriptLoader:
         }
         def _extract_info():
             print(f"🔧 Creating YouTubeDL instance with options: {ydl_opts}")
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                print(f"Calling extract_info for URL: {video_url}")
-                info = ydl.extract_info(video_url, download=False)
-                print(f"extract_info completed successfully")
-                
-                subtitles = info.get("subtitles", {})
-                auto_subs = info.get("automatic_captions", {})
-                available_langs = list(subtitles.keys()) + list(auto_subs.keys())
-                print(f"Found subtitles: {list(subtitles.keys())}")
-                print(f"Found auto_subs: {list(auto_subs.keys())}")
+            
+            # Try multiple approaches
+            approaches = [
+                ("Full options", ydl_opts),
+                ("Minimal options", {
+                    "skip_download": True,
+                    "quiet": True,
+                    "no_warnings": True,
+                }),
+                ("No headers", {
+                    "skip_download": True,
+                    "quiet": True,
+                    "no_warnings": True,
+                    "extract_flat": False,
+                })
+            ]
+            
+            for approach_name, opts in approaches:
+                try:
+                    print(f"Trying {approach_name}...")
+                    with yt_dlp.YoutubeDL(opts) as ydl:
+                        print(f"Calling extract_info for URL: {video_url}")
+                        info = ydl.extract_info(video_url, download=False)
+                        print(f"extract_info completed successfully with {approach_name}")
+                        
+                        subtitles = info.get("subtitles", {})
+                        auto_subs = info.get("automatic_captions", {})
+                        available_langs = list(subtitles.keys()) + list(auto_subs.keys())
+                        print(f"Found subtitles: {list(subtitles.keys())}")
+                        print(f"Found auto_subs: {list(auto_subs.keys())}")
 
-                # Check if the requested language is available
-                has_requested_lang = self.language in subtitles or self.language in auto_subs
-                print(f"🔍 Requested language '{self.language}' available: {has_requested_lang}")
-                
-                return {
-                    "valid": has_requested_lang,
-                    "video_id": video_id,
-                    "video_url": video_url,
-                    "language": self.language,
-                    "available_languages": available_langs,
-                    "error": f"No transcripts available in {self.language}. Available languages: {available_langs}" if not has_requested_lang else None
-                }
+                        # Check if the requested language is available
+                        has_requested_lang = self.language in subtitles or self.language in auto_subs
+                        print(f"🔍 Requested language '{self.language}' available: {has_requested_lang}")
+                        
+                        return {
+                            "valid": has_requested_lang,
+                            "video_id": video_id,
+                            "video_url": video_url,
+                            "language": self.language,
+                            "available_languages": available_langs,
+                            "error": f"No transcripts available in {self.language}. Available languages: {available_langs}" if not has_requested_lang else None
+                        }
+                except Exception as e:
+                    print(f"{approach_name} failed: {e}")
+                    if approach_name == approaches[-1][0]:  # Last approach
+                        raise e
+                    continue
+            
+            # This should never be reached, but just in case
+            raise Exception("All extraction approaches failed")
 
         try:
             return self._run_with_timeout(_extract_info, timeout_seconds=30)
@@ -125,7 +166,7 @@ class YouTubeTranscriptLoader:
             elif "age" in error_msg.lower() or "restricted" in error_msg.lower():
                 return {"valid": False, "video_id": video_id, "video_url": video_url, "error": "Video is age-restricted or region-blocked. Cannot access transcript."}
             elif "failed to extract any player response" in error_msg.lower() or "yt-dlp" in error_msg.lower():
-                return {"valid": False, "video_id": video_id, "video_url": video_url, "error": f"YouTube API issue detected. Full error: {error_msg}"}
+                return {"valid": False, "video_id": video_id, "video_url": video_url, "error": f"YouTube API issue detected. Try a different video or check if the video is accessible. Error: {error_msg}"}
             else:
                 return {"valid": False, "video_id": video_id, "video_url": video_url, "error": f"YouTube access error: {error_msg}"}
 
