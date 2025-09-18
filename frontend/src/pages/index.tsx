@@ -60,6 +60,7 @@ export default function Home() {
   const [youtubeResult, setYoutubeResult] = useState<UploadResult | null>(null);
   const [youtubeError, setYoutubeError] = useState<string>("");
   const [youtubeStatus, setYoutubeStatus] = useState<"idle" | "uploading" | "processing" | "chunking" | "ingesting" | "success" | "error">("idle");
+  const [youtubeProgress, setYoutubeProgress] = useState<{current: number, total: number, step: string, startTime?: number}>({current: 0, total: 0, step: ""});
   
   // Vector Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -306,13 +307,20 @@ export default function Home() {
     setYoutubeStatus('uploading');
     setUploadError('');
     setYoutubeResult(null);
+    setYoutubeProgress({current: 0, total: 0, step: "Starting...", startTime: Date.now()});
 
     try {
-      // Simulate progress steps like PDF upload
-      setTimeout(() => setYoutubeStatus('processing'), 1000);
-      setTimeout(() => setYoutubeStatus('chunking'), 2000);
-      setTimeout(() => setYoutubeStatus('ingesting'), 3000);
+      // Start with initial progress
+      setYoutubeStatus('uploading');
+      setYoutubeProgress({current: 1, total: 4, step: "Getting video info..."});
 
+      // Update progress as we make the request
+      setYoutubeStatus('processing');
+      setYoutubeProgress({current: 2, total: 4, step: "Extracting transcript..."});
+
+      // Show that we're waiting for backend processing
+      setYoutubeProgress({current: 2, total: 4, step: "Extracting transcript... (this may take a while)"});
+      
       const response = await fetch('/api/upload-youtube', {
         method: 'POST',
         headers: {
@@ -332,13 +340,34 @@ export default function Home() {
         throw new Error(errorData.details || errorData.error || 'Upload failed');
       }
 
+      // Update progress for chunking
+      setYoutubeStatus('chunking');
+      setYoutubeProgress({current: 3, total: 4, step: "Creating chunks..."});
+
       const result = await response.json();
       
       if (result.success) {
-        setYoutubeResult(result);
-        setYoutubeStatus('success');
-        // Refresh available sources only on success
-        fetchAvailableSources();
+        // Show detailed progress if we have chunk information
+        if (result.chunks_processed) {
+          setYoutubeStatus('ingesting');
+          setYoutubeProgress({
+            current: 4, 
+            total: 4, 
+            step: `Processing ${result.chunks_processed} chunks...`
+          });
+        } else {
+          setYoutubeStatus('ingesting');
+          setYoutubeProgress({current: 4, total: 4, step: "Storing in database..."});
+        }
+        
+        // Small delay to show the final step
+        setTimeout(() => {
+          setYoutubeResult(result);
+          setYoutubeStatus('success');
+          setYoutubeProgress({current: 4, total: 4, step: "Complete!"});
+          // Refresh available sources only on success
+          fetchAvailableSources();
+        }, 500);
       } else {
         // Handle error response from backend
         handleUploadError(result.message || 'YouTube processing failed');
@@ -870,6 +899,26 @@ export default function Home() {
                       {youtubeStatus === "ingesting" && "💾 Storing chunks in database..."}
                       {youtubeStatus === "error" && "❌ Processing failed - check error message above"}
                     </div>
+                    
+                    {/* Progress Bar */}
+                    {youtubeProgress.total > 0 && (
+                      <div className="progress-bar-container">
+                        <div className="progress-bar">
+                          <div 
+                            className="progress-bar-fill" 
+                            style={{width: `${(youtubeProgress.current / youtubeProgress.total) * 100}%`}}
+                          ></div>
+                        </div>
+                        <div className="progress-text">
+                          {youtubeProgress.step} ({youtubeProgress.current}/{youtubeProgress.total})
+                          {youtubeProgress.startTime && (
+                            <span className="progress-time">
+                              - {Math.round((Date.now() - youtubeProgress.startTime) / 1000)}s
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1567,6 +1616,38 @@ export default function Home() {
         .step.error .step-text {
           color: #dc3545;
           font-weight: 500;
+        }
+
+        .progress-bar-container {
+          margin-top: 15px;
+        }
+
+        .progress-bar {
+          width: 100%;
+          height: 8px;
+          background-color: #e9ecef;
+          border-radius: 4px;
+          overflow: hidden;
+          margin-bottom: 8px;
+        }
+
+        .progress-bar-fill {
+          height: 100%;
+          background-color: #007bff;
+          transition: width 0.3s ease;
+          border-radius: 4px;
+        }
+
+        .progress-text {
+          font-size: 12px;
+          color: #666;
+          text-align: center;
+        }
+
+        .progress-time {
+          color: #999;
+          font-size: 11px;
+          margin-left: 5px;
         }
 
         @keyframes pulse {
