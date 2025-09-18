@@ -44,13 +44,22 @@ export default function Home() {
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const [uploadError, setUploadError] = useState("");
   const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "processing" | "chunking" | "ingesting" | "success" | "error">("idle");
-  const [activeTab, setActiveTab] = useState<"chat" | "pdf" | "search" | "rag">("chat");
+  const [activeTab, setActiveTab] = useState<"chat" | "pdf" | "youtube" | "search" | "rag">("chat");
   const [errorTimeout, setErrorTimeout] = useState<NodeJS.Timeout | null>(null);
   const [errorCountdown, setErrorCountdown] = useState<number>(0);
   
   // Chunking configuration
   const [chunkSize, setChunkSize] = useState<number>(1000);
   const [chunkOverlap, setChunkOverlap] = useState<number>(200);
+  
+  // YouTube state
+  const [youtubeUrl, setYoutubeUrl] = useState<string>("");
+  const [youtubeLanguage, setYoutubeLanguage] = useState<string>("en");
+  const [youtubeChunkByTime, setYoutubeChunkByTime] = useState<boolean>(true);
+  const [youtubeChunkDuration, setYoutubeChunkDuration] = useState<number>(60);
+  const [youtubeResult, setYoutubeResult] = useState<UploadResult | null>(null);
+  const [youtubeError, setYoutubeError] = useState<string>("");
+  const [youtubeStatus, setYoutubeStatus] = useState<"idle" | "uploading" | "processing" | "chunking" | "ingesting" | "success" | "error">("idle");
   
   // Vector Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -281,6 +290,68 @@ export default function Home() {
     }
   };
 
+
+  // YouTube upload handler
+  const handleYouTubeUpload = async () => {
+    if (!youtubeUrl.trim()) {
+      handleUploadError('Please enter a YouTube URL');
+      return;
+    }
+
+    if (!apiKey) {
+      handleUploadError('❌ OpenAI API key is required for YouTube processing');
+      return;
+    }
+
+    setYoutubeStatus('uploading');
+    setUploadError('');
+    setYoutubeResult(null);
+
+    try {
+      // Simulate progress steps like PDF upload
+      setTimeout(() => setYoutubeStatus('processing'), 1000);
+      setTimeout(() => setYoutubeStatus('chunking'), 2000);
+      setTimeout(() => setYoutubeStatus('ingesting'), 3000);
+
+      const response = await fetch('/api/upload-youtube', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: youtubeUrl,
+          api_key: apiKey,
+          language: youtubeLanguage,
+          chunk_by_time: youtubeChunkByTime,
+          chunk_duration: youtubeChunkDuration
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.details || errorData.error || 'Upload failed');
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setYoutubeResult(result);
+        setYoutubeStatus('success');
+        // Refresh available sources only on success
+        fetchAvailableSources();
+      } else {
+        // Handle error response from backend
+        handleUploadError(result.message || 'YouTube processing failed');
+        setYoutubeStatus('error');
+      }
+      
+    } catch (error) {
+      console.error('YouTube upload error:', error);
+      handleUploadError(error instanceof Error ? error.message : 'YouTube processing failed');
+      setYoutubeStatus('error');
+    }
+  };
+
   // Fetch API key from environment
   const fetchApiKeyFromEnv = async () => {
     try {
@@ -487,6 +558,12 @@ export default function Home() {
               📄 Upload PDF
             </button>
             <button
+              className={`tab-button ${activeTab === "youtube" ? "active" : ""}`}
+              onClick={() => setActiveTab("youtube")}
+            >
+              📺 YouTube
+            </button>
+            <button
               className={`tab-button ${activeTab === "search" ? "active" : ""}`}
               onClick={() => setActiveTab("search")}
             >
@@ -646,7 +723,7 @@ export default function Home() {
                         : "Click to select PDF file"
                       }
                     </p>
-                    <p className="upload-subtext">Only PDF files are supported (max 10MB)</p>
+                    <p className="upload-subtext">Only PDF files are supported (max 4MB)</p>
                   </label>
                 </div>
                 
@@ -671,6 +748,151 @@ export default function Home() {
                       )}
                     </div>
                     <p>{uploadError}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "youtube" && (
+            <div className="tab-content">
+              <div className="pdf-upload-container">
+                <h3>Process YouTube Video</h3>
+                <p className="file-size-info">📺 Extract transcript from YouTube videos with subtitles</p>
+                
+                {/* YouTube URL Input */}
+                <div className="youtube-input-container">
+                  <label htmlFor="youtube-url" className={styles.label}>
+                    YouTube URL
+                  </label>
+                  <div className="input-with-clear">
+                    <input
+                      id="youtube-url"
+                      type="url"
+                      className={styles.textarea}
+                      value={youtubeUrl}
+                      onChange={(e) => setYoutubeUrl(e.target.value)}
+                      placeholder="https://www.youtube.com/watch?v=..."
+                      disabled={youtubeStatus === "uploading" || youtubeStatus === "processing" || youtubeStatus === "chunking" || youtubeStatus === "ingesting"}
+                    />
+                    {youtubeUrl && (
+                      <button
+                        type="button"
+                        className="clear-button"
+                        onClick={() => setYoutubeUrl("")}
+                        disabled={youtubeStatus === "uploading" || youtubeStatus === "processing" || youtubeStatus === "chunking" || youtubeStatus === "ingesting"}
+                        title="Clear URL"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* YouTube Configuration */}
+                <div className="chunking-config">
+                  <h4>Processing Configuration</h4>
+                  <div className="config-row">
+                    <div className="config-group">
+                      <label htmlFor="youtube-language">Language:</label>
+                      <select
+                        id="youtube-language"
+                        value={youtubeLanguage}
+                        onChange={(e) => setYoutubeLanguage(e.target.value)}
+                        disabled={youtubeStatus === "uploading" || youtubeStatus === "processing" || youtubeStatus === "chunking" || youtubeStatus === "ingesting"}
+                      >
+                        <option value="en">English</option>
+                        <option value="es">Spanish</option>
+                        <option value="fr">French</option>
+                        <option value="de">German</option>
+                        <option value="it">Italian</option>
+                        <option value="pt">Portuguese</option>
+                        <option value="ru">Russian</option>
+                        <option value="ja">Japanese</option>
+                        <option value="ko">Korean</option>
+                        <option value="zh">Chinese</option>
+                      </select>
+                    </div>
+                    <div className="config-group">
+                      <label htmlFor="youtube-chunk-duration">Chunk Duration: {youtubeChunkDuration} seconds</label>
+                      <input
+                        type="range"
+                        id="youtube-chunk-duration"
+                        min="30"
+                        max="300"
+                        step="30"
+                        value={youtubeChunkDuration}
+                        onChange={(e) => setYoutubeChunkDuration(parseInt(e.target.value))}
+                        disabled={youtubeStatus === "uploading" || youtubeStatus === "processing" || youtubeStatus === "chunking" || youtubeStatus === "ingesting"}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Upload Button */}
+                <button
+                  onClick={handleYouTubeUpload}
+                  disabled={youtubeStatus === "uploading" || youtubeStatus === "processing" || youtubeStatus === "chunking" || youtubeStatus === "ingesting" || !youtubeUrl.trim() || !apiKey}
+                  className={styles.button}
+                >
+                  {youtubeStatus === "uploading" ? "⏳ Uploading..." : 
+                   youtubeStatus === "processing" ? "⏳ Processing..." :
+                   youtubeStatus === "chunking" ? "⏳ Chunking..." :
+                   youtubeStatus === "ingesting" ? "⏳ Ingesting..." :
+                   "📺 Process Video"}
+                </button>
+
+                {/* Status Messages */}
+                {youtubeStatus !== "idle" && youtubeStatus !== "success" && (
+                  <div className="upload-progress-container">
+                    <div className="progress-steps">
+                      <div className={`step ${youtubeStatus === "uploading" ? "active" : youtubeStatus === "processing" || youtubeStatus === "chunking" || youtubeStatus === "ingesting" ? "completed" : youtubeStatus === "error" ? "error" : ""}`}>
+                        <div className="step-icon">🔍</div>
+                        <div className="step-text">Getting Video Info</div>
+                      </div>
+                      <div className={`step ${youtubeStatus === "processing" ? "active" : youtubeStatus === "chunking" || youtubeStatus === "ingesting" ? "completed" : youtubeStatus === "error" ? "error" : ""}`}>
+                        <div className="step-icon">📝</div>
+                        <div className="step-text">Extracting Transcript</div>
+                      </div>
+                      <div className={`step ${youtubeStatus === "chunking" ? "active" : youtubeStatus === "ingesting" ? "completed" : youtubeStatus === "error" ? "error" : ""}`}>
+                        <div className="step-icon">✂️</div>
+                        <div className="step-text">Creating Chunks</div>
+                      </div>
+                      <div className={`step ${youtubeStatus === "ingesting" ? "active" : youtubeStatus === "error" ? "error" : ""}`}>
+                        <div className="step-icon">💾</div>
+                        <div className="step-text">Storing in Database</div>
+                      </div>
+                    </div>
+                    <div className="progress-note">
+                      {youtubeStatus === "uploading" && "🔍 Getting video info from YouTube..."}
+                      {youtubeStatus === "processing" && "📝 Extracting transcript..."}
+                      {youtubeStatus === "chunking" && "✂️ Creating text chunks..."}
+                      {youtubeStatus === "ingesting" && "💾 Storing chunks in database..."}
+                      {youtubeStatus === "error" && "❌ Processing failed - check error message above"}
+                    </div>
+                  </div>
+                )}
+
+                {uploadError && (
+                  <div className="upload-error">
+                    <div className="error-header">
+                      <h4>❌ YouTube Processing Failed</h4>
+                      {errorCountdown > 0 && (
+                        <span className="error-countdown">
+                          Auto-dismiss in {errorCountdown}s
+                        </span>
+                      )}
+                    </div>
+                    <p>{uploadError}</p>
+                  </div>
+                )}
+
+                {youtubeResult && (
+                  <div className="upload-success">
+                    <h4>✅ YouTube Processing Successful!</h4>
+                    <p><strong>Message:</strong> {youtubeResult.message}</p>
+                    <p><strong>Chunks processed:</strong> {youtubeResult.chunks_processed}</p>
+                    <p><strong>Total characters:</strong> {youtubeResult.total_characters?.toLocaleString() || 'N/A'}</p>
                   </div>
                 )}
               </div>
@@ -1001,6 +1223,53 @@ export default function Home() {
           font-style: italic;
         }
 
+        .youtube-input-container {
+          margin: 20px 0;
+        }
+
+        .input-with-clear {
+          position: relative;
+          display: flex;
+          align-items: center;
+        }
+
+        .input-with-clear input {
+          width: 100%;
+          padding: 12px 40px 12px 12px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          font-size: 16px;
+        }
+
+        .clear-button {
+          position: absolute;
+          right: 8px;
+          background: none;
+          border: none;
+          color: #666;
+          cursor: pointer;
+          font-size: 18px;
+          padding: 4px;
+          border-radius: 50%;
+          width: 24px;
+          height: 24px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s ease;
+        }
+
+        .clear-button:hover {
+          background-color: #f0f0f0;
+          color: #333;
+        }
+
+        .clear-button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+
         .chunking-config {
           margin: 20px 0;
           padding: 20px;
@@ -1287,6 +1556,16 @@ export default function Home() {
 
         .step.completed .step-text {
           color: #28a745;
+          font-weight: 500;
+        }
+
+        .step.error .step-icon {
+          background-color: #dc3545;
+          color: white;
+        }
+
+        .step.error .step-text {
+          color: #dc3545;
           font-weight: 500;
         }
 
