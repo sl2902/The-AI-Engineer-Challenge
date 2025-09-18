@@ -291,6 +291,14 @@ export default function Home() {
     }
   };
 
+  // YouTube reset handler
+  const handleYouTubeReset = () => {
+    setYoutubeStatus('idle');
+    setYoutubeResult(null);
+    setYoutubeError('');
+    setUploadError('');
+    setYoutubeProgress({current: 0, total: 0, step: ""});
+  };
 
   // YouTube upload handler
   const handleYouTubeUpload = async () => {
@@ -859,17 +867,29 @@ export default function Home() {
                 </div>
 
                 {/* Upload Button */}
-                <button
-                  onClick={handleYouTubeUpload}
-                  disabled={youtubeStatus === "uploading" || youtubeStatus === "processing" || youtubeStatus === "chunking" || youtubeStatus === "ingesting" || !youtubeUrl.trim() || !apiKey}
-                  className={styles.button}
-                >
-                  {youtubeStatus === "uploading" ? "⏳ Uploading..." : 
-                   youtubeStatus === "processing" ? "⏳ Processing..." :
-                   youtubeStatus === "chunking" ? "⏳ Chunking..." :
-                   youtubeStatus === "ingesting" ? "⏳ Ingesting..." :
-                   "📺 Process Video"}
-                </button>
+                <div className="button-group">
+                  <button
+                    onClick={handleYouTubeUpload}
+                    disabled={youtubeStatus === "uploading" || youtubeStatus === "processing" || youtubeStatus === "chunking" || youtubeStatus === "ingesting" || !youtubeUrl.trim() || !apiKey}
+                    className={styles.button}
+                  >
+                    {youtubeStatus === "uploading" ? "⏳ Uploading..." : 
+                     youtubeStatus === "processing" ? "⏳ Processing..." :
+                     youtubeStatus === "chunking" ? "⏳ Chunking..." :
+                     youtubeStatus === "ingesting" ? "⏳ Ingesting..." :
+                     "📺 Process Video"}
+                  </button>
+                  
+                  {(youtubeStatus === "error" || youtubeStatus === "success") && (
+                    <button
+                      onClick={handleYouTubeReset}
+                      className="reset-button"
+                      title="Reset and try again"
+                    >
+                      🔄 Reset
+                    </button>
+                  )}
+                </div>
 
                 {/* Status Messages */}
                 {youtubeStatus !== "idle" && youtubeStatus !== "success" && (
@@ -938,7 +958,16 @@ export default function Home() {
 
                 {youtubeResult && (
                   <div className="upload-success">
-                    <h4>✅ YouTube Processing Successful!</h4>
+                    <div className="success-header">
+                      <h4>✅ YouTube Processing Successful!</h4>
+                      <button
+                        onClick={handleYouTubeReset}
+                        className="reset-button-small"
+                        title="Reset and try another video"
+                      >
+                        🔄 Reset
+                      </button>
+                    </div>
                     <p><strong>Message:</strong> {youtubeResult.message}</p>
                     <p><strong>Chunks processed:</strong> {youtubeResult.chunks_processed}</p>
                     <p><strong>Total characters:</strong> {youtubeResult.total_characters?.toLocaleString() || 'N/A'}</p>
@@ -1206,9 +1235,32 @@ export default function Home() {
           border: 1px solid #c3e6cb;
         }
 
+        .success-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 10px;
+        }
+
         .upload-success h4 {
-          margin: 0 0 10px 0;
+          margin: 0;
           font-size: 16px;
+        }
+
+        .reset-button-small {
+          background-color: #6c757d;
+          color: white;
+          border: none;
+          padding: 5px 10px;
+          border-radius: 3px;
+          cursor: pointer;
+          font-size: 12px;
+          font-weight: 500;
+          transition: all 0.2s ease;
+        }
+
+        .reset-button-small:hover {
+          background-color: #5a6268;
         }
 
         .upload-success p {
@@ -1316,6 +1368,33 @@ export default function Home() {
         .clear-button:disabled {
           opacity: 0.5;
           cursor: not-allowed;
+        }
+
+        .button-group {
+          display: flex;
+          gap: 10px;
+          align-items: center;
+          margin: 20px 0;
+        }
+
+        .reset-button {
+          background-color: #6c757d;
+          color: white;
+          border: none;
+          padding: 10px 20px;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 500;
+          transition: all 0.2s ease;
+        }
+
+        .reset-button:hover {
+          background-color: #5a6268;
+        }
+
+        .reset-button:active {
+          background-color: #545b62;
         }
 
 
