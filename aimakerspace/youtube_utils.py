@@ -57,7 +57,23 @@ class YouTubeTranscriptLoader:
             "quiet": True,
             "socket_timeout": 10,  # 10 second timeout
             "timeout": 10,         # 10 second timeout
-            "outtmpl": "/tmp/aimakerspace/data/%(video_id)s.%(ext)s"
+            "outtmpl": "/tmp/aimakerspace/data/%(video_id)s.%(ext)s",
+            "extractor_retries": 3,  # Retry on failures
+            "fragment_retries": 3,   # Retry fragment downloads
+            "http_headers": {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept-Encoding": "gzip, deflate, br",
+                "DNT": "1",
+                "Connection": "keep-alive",
+                "Upgrade-Insecure-Requests": "1",
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "none",
+                "Sec-Fetch-User": "?1",
+                "Cache-Control": "max-age=0"
+            }
         }
         def _extract_info():
             print(f"🔧 Creating YouTubeDL instance with options: {ydl_opts}")
@@ -96,7 +112,7 @@ class YouTubeTranscriptLoader:
             
             # Handle common YouTube errors
             if "bot" in error_msg.lower() or "captcha" in error_msg.lower() or "verify" in error_msg.lower():
-                return {"valid": False, "video_id": video_id, "video_url": video_url, "error": "YouTube detected automated access. Please try again later or use a different video."}
+                return {"valid": False, "video_id": video_id, "video_url": video_url, "error": "YouTube detected automated access. The request will be retried with browser-like headers."}
             elif "private" in error_msg.lower() or "unavailable" in error_msg.lower():
                 return {"valid": False, "video_id": video_id, "video_url": video_url, "error": "Video is private or unavailable. Please check the URL and try again."}
             elif "age" in error_msg.lower() or "restricted" in error_msg.lower():
@@ -119,6 +135,22 @@ class YouTubeTranscriptLoader:
             "quiet": True,
             "socket_timeout": 30,  # 30 second timeout
             "timeout": 30,         # 30 second timeout
+            "extractor_retries": 3,  # Retry on failures
+            "fragment_retries": 3,   # Retry fragment downloads
+            "http_headers": {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept-Encoding": "gzip, deflate, br",
+                "DNT": "1",
+                "Connection": "keep-alive",
+                "Upgrade-Insecure-Requests": "1",
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "none",
+                "Sec-Fetch-User": "?1",
+                "Cache-Control": "max-age=0"
+            }
         }
 
         def _get_transcript_info():
@@ -140,7 +172,7 @@ class YouTubeTranscriptLoader:
             
             # Handle common YouTube errors
             if "bot" in error_msg.lower() or "captcha" in error_msg.lower() or "verify" in error_msg.lower():
-                raise Exception("YouTube detected automated access. Please try again later or use a different video.")
+                raise Exception("YouTube detected automated access. The request will be retried with browser-like headers.")
             elif "private" in error_msg.lower() or "unavailable" in error_msg.lower():
                 raise Exception("Video is private or unavailable. Please check the URL and try again.")
             elif "age" in error_msg.lower() or "restricted" in error_msg.lower():
@@ -150,7 +182,19 @@ class YouTubeTranscriptLoader:
 
         # Fetch and parse VTT manually
         import requests
-        resp = requests.get(url)
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/vtt,text/plain,*/*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            "DNT": "1",
+            "Connection": "keep-alive",
+            "Referer": "https://www.youtube.com/",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "cross-site"
+        }
+        resp = requests.get(url, headers=headers, timeout=30)
         resp.raise_for_status()
         vtt_text = resp.text
 
