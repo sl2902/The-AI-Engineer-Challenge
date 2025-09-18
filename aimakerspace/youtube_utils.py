@@ -117,6 +117,8 @@ class YouTubeTranscriptLoader:
                 return {"valid": False, "video_id": video_id, "video_url": video_url, "error": "Video is private or unavailable. Please check the URL and try again."}
             elif "age" in error_msg.lower() or "restricted" in error_msg.lower():
                 return {"valid": False, "video_id": video_id, "video_url": video_url, "error": "Video is age-restricted or region-blocked. Cannot access transcript."}
+            elif "failed to extract any player response" in error_msg.lower() or "yt-dlp" in error_msg.lower():
+                return {"valid": False, "video_id": video_id, "video_url": video_url, "error": "YouTube API changed. Please try again later or contact support if the issue persists."}
             else:
                 return {"valid": False, "video_id": video_id, "video_url": video_url, "error": f"YouTube access error: {error_msg}"}
 
@@ -177,6 +179,8 @@ class YouTubeTranscriptLoader:
                 raise Exception("Video is private or unavailable. Please check the URL and try again.")
             elif "age" in error_msg.lower() or "restricted" in error_msg.lower():
                 raise Exception("Video is age-restricted or region-blocked. Cannot access transcript.")
+            elif "failed to extract any player response" in error_msg.lower() or "yt-dlp" in error_msg.lower():
+                raise Exception("YouTube API changed. Please try again later or contact support if the issue persists.")
             else:
                 raise Exception(f"YouTube access error: {error_msg}")
 
