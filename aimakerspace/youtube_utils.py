@@ -15,6 +15,14 @@ except ImportError:
 class YouTubeTranscriptLoader:
     def __init__(self, language: str = "en"):
         self.language = language
+        
+        # Check if we're running on Vercel (serverless environment)
+        self.is_vercel = self._is_vercel_environment()
+        
+        if self.is_vercel:
+            print("YouTube processing disabled on Vercel due to bot detection issues")
+            return
+        
         # Log yt-dlp version for debugging
         try:
             import yt_dlp
@@ -34,6 +42,16 @@ class YouTubeTranscriptLoader:
             print(f"YouTube connectivity test: {response.status_code}")
         except Exception as e:
             print(f"YouTube connectivity test failed: {e}")
+    
+    def _is_vercel_environment(self) -> bool:
+        """Check if we're running on Vercel serverless environment."""
+        import os
+        return (
+            os.getenv("VERCEL") == "1" or 
+            os.getenv("VERCEL_ENV") is not None or
+            os.getenv("VERCEL_URL") is not None or
+            "vercel" in os.getenv("HOSTNAME", "").lower()
+        )
 
     def _run_with_timeout(self, func, timeout_seconds=30):
         """Run a function with a timeout to prevent hanging."""
@@ -73,6 +91,12 @@ class YouTubeTranscriptLoader:
 
     def get_video_info(self, video_url: str) -> Dict[str, Any]:
         """Get video info (and whether transcript is available)."""
+        if self.is_vercel:
+            return {
+                "valid": False, 
+                "error": "YouTube processing is disabled on Vercel due to bot detection issues. Please use this feature locally."
+            }
+        
         video_id = self.extract_video_id(video_url)
         ext = 'txt'
         if not video_id:
@@ -174,6 +198,9 @@ class YouTubeTranscriptLoader:
 
     def get_transcript(self, video_url: str, chunk_by_time: bool = True, chunk_duration: int = 60) -> List[Dict[str, Any]]:
         """Fetch transcript using yt_dlp (falls back to auto captions)."""
+        if self.is_vercel:
+            raise Exception("YouTube processing is disabled on Vercel due to bot detection issues. Please use this feature locally.")
+        
         video_id = self.extract_video_id(video_url)
         if not video_id:
             raise ValueError(f"Invalid YouTube URL: {video_url}")

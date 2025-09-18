@@ -796,6 +796,9 @@ export default function Home() {
               <div className="pdf-upload-container">
                 <h3>Process YouTube Video</h3>
                 <p className="file-size-info">📺 Extract transcript from YouTube videos with subtitles</p>
+                <div className="youtube-disabled-notice">
+                  <p>⚠️ <strong>Note:</strong> YouTube processing is disabled on Vercel due to bot detection issues. This feature works locally.</p>
+                </div>
                 
                 {/* YouTube URL Input */}
                 <div className="youtube-input-container">
@@ -810,15 +813,17 @@ export default function Home() {
                       value={youtubeUrl}
                       onChange={(e) => setYoutubeUrl(e.target.value)}
                       placeholder="https://www.youtube.com/watch?v=..."
-                      disabled={youtubeStatus === "uploading" || youtubeStatus === "processing" || youtubeStatus === "chunking" || youtubeStatus === "ingesting"}
+                      disabled={true}
+                      style={{opacity: 0.5, cursor: 'not-allowed'}}
                     />
                     {youtubeUrl && (
                       <button
                         type="button"
                         className="clear-button"
                         onClick={() => setYoutubeUrl("")}
-                        disabled={youtubeStatus === "uploading" || youtubeStatus === "processing" || youtubeStatus === "chunking" || youtubeStatus === "ingesting"}
+                        disabled={true}
                         title="Clear URL"
+                        style={{opacity: 0.5, cursor: 'not-allowed'}}
                       >
                         ✕
                       </button>
@@ -827,7 +832,7 @@ export default function Home() {
                 </div>
 
                 {/* YouTube Configuration */}
-                <div className="chunking-config">
+                <div className="chunking-config" style={{opacity: 0.5, pointerEvents: 'none'}}>
                   <h4>Processing Configuration</h4>
                   <div className="config-row">
                     <div className="config-group">
@@ -836,7 +841,7 @@ export default function Home() {
                         id="youtube-language"
                         value={youtubeLanguage}
                         onChange={(e) => setYoutubeLanguage(e.target.value)}
-                        disabled={youtubeStatus === "uploading" || youtubeStatus === "processing" || youtubeStatus === "chunking" || youtubeStatus === "ingesting"}
+                        disabled={true}
                       >
                         <option value="en">English</option>
                         <option value="es">Spanish</option>
@@ -860,7 +865,7 @@ export default function Home() {
                         step="30"
                         value={youtubeChunkDuration}
                         onChange={(e) => setYoutubeChunkDuration(parseInt(e.target.value))}
-                        disabled={youtubeStatus === "uploading" || youtubeStatus === "processing" || youtubeStatus === "chunking" || youtubeStatus === "ingesting"}
+                        disabled={true}
                       />
                     </div>
                   </div>
@@ -870,14 +875,12 @@ export default function Home() {
                 <div className="button-group">
                   <button
                     onClick={handleYouTubeUpload}
-                    disabled={youtubeStatus === "uploading" || youtubeStatus === "processing" || youtubeStatus === "chunking" || youtubeStatus === "ingesting" || !youtubeUrl.trim() || !apiKey}
+                    disabled={true}
                     className={styles.button}
+                    style={{opacity: 0.5, cursor: 'not-allowed'}}
+                    title="YouTube processing is disabled on Vercel"
                   >
-                    {youtubeStatus === "uploading" ? "⏳ Uploading..." : 
-                     youtubeStatus === "processing" ? "⏳ Processing..." :
-                     youtubeStatus === "chunking" ? "⏳ Chunking..." :
-                     youtubeStatus === "ingesting" ? "⏳ Ingesting..." :
-                     "📺 Process Video"}
+                    📺 Process Video (Disabled on Vercel)
                   </button>
                   
                   {(youtubeStatus === "error" || youtubeStatus === "success") && (
@@ -885,6 +888,8 @@ export default function Home() {
                       onClick={handleYouTubeReset}
                       className="reset-button"
                       title="Reset and try again"
+                      disabled={true}
+                      style={{opacity: 0.5, cursor: 'not-allowed'}}
                     >
                       🔄 Reset
                     </button>
@@ -1322,6 +1327,20 @@ export default function Home() {
           color: #666;
           font-size: 14px;
           font-style: italic;
+        }
+
+        .youtube-disabled-notice {
+          background-color: #fff3cd;
+          border: 1px solid #ffeaa7;
+          border-radius: 6px;
+          padding: 12px;
+          margin: 15px 0;
+          color: #856404;
+        }
+
+        .youtube-disabled-notice p {
+          margin: 0;
+          font-size: 14px;
         }
 
         .youtube-input-container {

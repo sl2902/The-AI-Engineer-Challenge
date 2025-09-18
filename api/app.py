@@ -201,6 +201,25 @@ async def upload_youtube(request: YouTubeUploadRequest):
     Returns:
         PDFUploadResponse with processing results
     """
+    # Check if we're running on Vercel (serverless environment)
+    import os
+    is_vercel = (
+        os.getenv("VERCEL") == "1" or 
+        os.getenv("VERCEL_ENV") is not None or
+        os.getenv("VERCEL_URL") is not None or
+        "vercel" in os.getenv("HOSTNAME", "").lower()
+    )
+    
+    if is_vercel:
+        print("🚫 YouTube processing disabled on Vercel due to bot detection issues")
+        return PDFUploadResponse(
+            success=False,
+            message="YouTube processing is disabled on Vercel due to bot detection issues. Please use this feature locally.",
+            chunks_processed=0,
+            filename="",
+            total_characters=0
+        )
+    
     try:
         print(f"🎬 YouTube upload started for URL: {request.url}")
         
