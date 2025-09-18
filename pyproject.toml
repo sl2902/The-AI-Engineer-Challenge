@@ -12,4 +12,6 @@ dependencies = [
     "uvicorn>=0.34.2",
     "python-dotenv",
     "faiss-cpu>=1.12.0",
+    "yt-dlp>=2025.9.5",
+    "requests>=2.32.5",
 ]
