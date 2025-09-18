@@ -83,7 +83,8 @@ class YouTubeTranscriptLoader:
             "quiet": True,
             "socket_timeout": 10,  # 10 second timeout
             "timeout": 10,         # 10 second timeout
-            "outtmpl": "/tmp/aimakerspace/data/%(video_id)s.%(ext)s"
+            "outtmpl": "/tmp/aimakerspace/data/%(video_id)s.%(ext)s",
+            "cookiesfrombrowser": ("chrome",),  # Try to use Chrome cookies
         }
         def _extract_info():
             print(f"🔧 Creating YouTubeDL instance with options: {ydl_opts}")
@@ -148,6 +149,7 @@ class YouTubeTranscriptLoader:
             "quiet": True,
             "socket_timeout": 30,  # 30 second timeout
             "timeout": 30,         # 30 second timeout
+            "cookiesfrombrowser": ("chrome",),  # Try to use Chrome cookies
         }
 
         def _get_transcript_info():
