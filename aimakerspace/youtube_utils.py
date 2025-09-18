@@ -84,33 +84,71 @@ class YouTubeTranscriptLoader:
             "socket_timeout": 10,  # 10 second timeout
             "timeout": 10,         # 10 second timeout
             "outtmpl": "/tmp/aimakerspace/data/%(video_id)s.%(ext)s",
-            "cookiesfrombrowser": ("chrome",),  # Try to use Chrome cookies
+            "extractor_retries": 3,  # Retry on failures
+            "fragment_retries": 3,   # Retry fragment downloads
         }
         def _extract_info():
             print(f"🔧 Creating YouTubeDL instance with options: {ydl_opts}")
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                print(f"Calling extract_info for URL: {video_url}")
-                info = ydl.extract_info(video_url, download=False)
-                print(f"extract_info completed successfully")
-                
-                subtitles = info.get("subtitles", {})
-                auto_subs = info.get("automatic_captions", {})
-                available_langs = list(subtitles.keys()) + list(auto_subs.keys())
-                print(f"Found subtitles: {list(subtitles.keys())}")
-                print(f"Found auto_subs: {list(auto_subs.keys())}")
+            
+            # Try with retries first
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    print(f"Calling extract_info for URL: {video_url}")
+                    info = ydl.extract_info(video_url, download=False)
+                    print(f"extract_info completed successfully")
+                    
+                    subtitles = info.get("subtitles", {})
+                    auto_subs = info.get("automatic_captions", {})
+                    available_langs = list(subtitles.keys()) + list(auto_subs.keys())
+                    print(f"Found subtitles: {list(subtitles.keys())}")
+                    print(f"Found auto_subs: {list(auto_subs.keys())}")
 
-                # Check if the requested language is available
-                has_requested_lang = self.language in subtitles or self.language in auto_subs
-                print(f"🔍 Requested language '{self.language}' available: {has_requested_lang}")
+                    # Check if the requested language is available
+                    has_requested_lang = self.language in subtitles or self.language in auto_subs
+                    print(f"🔍 Requested language '{self.language}' available: {has_requested_lang}")
+                    
+                    return {
+                        "valid": has_requested_lang,
+                        "video_id": video_id,
+                        "video_url": video_url,
+                        "language": self.language,
+                        "available_languages": available_langs,
+                        "error": f"No transcripts available in {self.language}. Available languages: {available_langs}" if not has_requested_lang else None
+                    }
+            except Exception as e:
+                print(f"First attempt failed: {e}")
+                print("Trying with minimal options...")
                 
-                return {
-                    "valid": has_requested_lang,
-                    "video_id": video_id,
-                    "video_url": video_url,
-                    "language": self.language,
-                    "available_languages": available_langs,
-                    "error": f"No transcripts available in {self.language}. Available languages: {available_langs}" if not has_requested_lang else None
+                # Fallback with minimal options
+                minimal_opts = {
+                    "skip_download": True,
+                    "quiet": True,
+                    "no_warnings": True,
                 }
+                
+                with yt_dlp.YoutubeDL(minimal_opts) as ydl:
+                    print(f"Calling extract_info with minimal options for URL: {video_url}")
+                    info = ydl.extract_info(video_url, download=False)
+                    print(f"Minimal extract_info completed successfully")
+                    
+                    subtitles = info.get("subtitles", {})
+                    auto_subs = info.get("automatic_captions", {})
+                    available_langs = list(subtitles.keys()) + list(auto_subs.keys())
+                    print(f"Found subtitles: {list(subtitles.keys())}")
+                    print(f"Found auto_subs: {list(auto_subs.keys())}")
+
+                    # Check if the requested language is available
+                    has_requested_lang = self.language in subtitles or self.language in auto_subs
+                    print(f"🔍 Requested language '{self.language}' available: {has_requested_lang}")
+                    
+                    return {
+                        "valid": has_requested_lang,
+                        "video_id": video_id,
+                        "video_url": video_url,
+                        "language": self.language,
+                        "available_languages": available_langs,
+                        "error": f"No transcripts available in {self.language}. Available languages: {available_langs}" if not has_requested_lang else None
+                    }
 
         try:
             return self._run_with_timeout(_extract_info, timeout_seconds=30)
@@ -149,7 +187,8 @@ class YouTubeTranscriptLoader:
             "quiet": True,
             "socket_timeout": 30,  # 30 second timeout
             "timeout": 30,         # 30 second timeout
-            "cookiesfrombrowser": ("chrome",),  # Try to use Chrome cookies
+            "extractor_retries": 3,  # Retry on failures
+            "fragment_retries": 3,   # Retry fragment downloads
         }
 
         def _get_transcript_info():
