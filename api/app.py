@@ -10,11 +10,14 @@ import os
 import sys
 from typing import Optional
 from dotenv import load_dotenv
+import numpy as np
+from datetime import datetime
 
 # Add the parent directory to the path to import aimakerspace modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from aimakerspace.pdf_utils import create_pdf_processor
+from aimakerspace.youtube_utils import YouTubeTranscriptLoader
 from aimakerspace.vectordatabase import VectorDatabase, cosine_similarity, euclidean_distance, manhattan_distance
 from aimakerspace.rag_pipeline import create_rag_pipeline
 import asyncio
@@ -78,6 +81,13 @@ class RAGRequest(BaseModel):
     distance_metric: Optional[str] = "cosine_similarity"
     include_context: bool = False
     stream: bool = False
+
+class YouTubeUploadRequest(BaseModel):
+    url: str
+    api_key: str
+    language: str = "en"
+    chunk_by_time: bool = True
+    chunk_duration: int = 60
 
 class RAGResponse(BaseModel):
     response: str
@@ -177,6 +187,146 @@ async def upload_pdf(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"PDF processing failed: {str(e)}")
+
+# Define YouTube upload endpoint
+@app.post("/api/upload-youtube", response_model=PDFUploadResponse)
+async def upload_youtube(request: YouTubeUploadRequest):
+    """
+    Process a YouTube video URL, extract transcript, and store it in the vector database.
+    
+    Args:
+        request: YouTube upload request containing URL, API key, and processing options
+        
+    Returns:
+        PDFUploadResponse with processing results
+    """
+    try:
+        print(f"🎬 YouTube upload started for URL: {request.url}")
+        
+        # Validate API key
+        if request.api_key != api_key:
+            print("❌ Invalid API key")
+            raise HTTPException(status_code=401, detail="Invalid API key")
+        
+        print("✅ API key validated")
+        
+        # Initialize YouTube transcript loader
+        print("🔧 Initializing YouTube transcript loader...")
+        loader = YouTubeTranscriptLoader(language=request.language)
+        print("✅ YouTube transcript loader initialized")
+        
+        # Get video info first with timeout
+        print("🔍 Getting video info...")
+        try:
+            # Use a simpler approach - just call the method directly
+            # The timeout is handled in the YouTube utils itself
+            video_info = loader.get_video_info(request.url)
+            print(f"📊 Video info result: {video_info}")
+            if not video_info.get("valid", False):
+                error_msg = video_info.get('error', 'Unknown error')
+                print(f"❌ Video not valid: {error_msg}")
+                # Return a proper error response instead of raising HTTPException
+                return PDFUploadResponse(
+                    success=False,
+                    message=f"❌ {error_msg}",
+                    chunks_processed=0,
+                    filename="",
+                    total_characters=0
+                )
+        except Exception as e:
+            error_msg = str(e)
+            print(f"❌ Failed to get video info: {error_msg}")
+            # Return a proper error response instead of raising HTTPException
+            return PDFUploadResponse(
+                success=False,
+                message=f"❌ Failed to get video info: {error_msg}",
+                chunks_processed=0,
+                filename="",
+                total_characters=0
+            )
+        
+        print("✅ Video info retrieved successfully")
+        
+        # Extract transcript with timeout
+        print("📝 Extracting transcript...")
+        try:
+            transcript_chunks = loader.get_transcript(
+                request.url, 
+                chunk_by_time=request.chunk_by_time,
+                chunk_duration=request.chunk_duration
+            )
+            print(f"📊 Extracted {len(transcript_chunks)} transcript chunks")
+        except Exception as e:
+            error_msg = str(e)
+            print(f"❌ Failed to extract transcript: {error_msg}")
+            # Return a proper error response instead of raising HTTPException
+            return PDFUploadResponse(
+                success=False,
+                message=f"❌ Failed to extract transcript: {error_msg}",
+                chunks_processed=0,
+                filename="",
+                total_characters=0
+            )
+        
+        if not transcript_chunks:
+            print("❌ No transcript chunks extracted")
+            # Return a proper error response instead of raising HTTPException
+            return PDFUploadResponse(
+                success=False,
+                message="❌ No transcript content could be extracted from the video",
+                chunks_processed=0,
+                filename="",
+                total_characters=0
+            )
+        
+        print("✅ Transcript extracted successfully")
+        
+        # Process chunks and add to vector database
+        total_chunks = len(transcript_chunks)
+        total_characters = sum(len(chunk["text"]) for chunk in transcript_chunks)
+        print(f"📊 Processing {total_chunks} chunks with {total_characters} total characters")
+        
+        # Add each chunk to vector database
+        for i, chunk in enumerate(transcript_chunks):
+            print(f"🔄 Processing chunk {i+1}/{total_chunks}")
+            
+            # Get embedding for this chunk
+            print(f"🧠 Getting embedding for chunk {i+1}...")
+            embedding = await vector_db.embedding_model.async_get_embeddings([chunk["text"]])
+            print(f"✅ Embedding generated for chunk {i+1}")
+            
+            # Prepare metadata
+            metadata = {
+                "source": "YouTube",  # Use consistent source name
+                "source_type": "youtube",
+                "chunk_index": i,
+                "chunk_length": len(chunk["text"]),
+                "timestamp": datetime.now().isoformat(),
+                "total_chunks": total_chunks,
+                **chunk["metadata"]  # Include YouTube-specific metadata
+            }
+            
+            # Insert into vector database
+            print(f"💾 Inserting chunk {i+1} into vector database...")
+            vector_db.insert(chunk["text"], np.array(embedding[0]), metadata)
+            print(f"✅ Chunk {i+1} inserted successfully")
+        
+        print("🎉 All chunks processed and inserted successfully!")
+        
+        return PDFUploadResponse(
+            success=True,
+            message=f"Successfully processed YouTube video: {video_info['video_id']}",
+            filename=f"video_{video_info['video_id']}",
+            chunks_processed=total_chunks,
+            total_characters=total_characters
+        )
+        
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"YouTube processing failed: {str(e)}")
 
 # Define vector database search endpoint
 @app.post("/api/search-vectors", response_model=VectorDBSearchResponse)

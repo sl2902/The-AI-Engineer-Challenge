@@ -2,13 +2,33 @@ import yt_dlp
 from typing import List, Dict, Any
 from datetime import datetime
 import re
+import asyncio
+import concurrent.futures
 
 class YouTubeTranscriptLoader:
     def __init__(self, language: str = "en"):
         self.language = language
 
+    def _run_with_timeout(self, func, timeout_seconds=30):
+        """Run a function with a timeout to prevent hanging."""
+        try:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(func)
+                return future.result(timeout=timeout_seconds)
+        except concurrent.futures.TimeoutError:
+            print(f"Function timed out after {timeout_seconds} seconds")
+            raise TimeoutError(f"Operation timed out after {timeout_seconds} seconds")
+        except Exception as e:
+            print(f"Function failed: {str(e)}")
+            raise
+
     def extract_video_id(self, url: str) -> str | None:
         """Extract video ID from common YouTube URL formats."""
+        # Check for invalid URL patterns that indicate playlists or multiple videos
+        if '&' in url or 'list=' in url or 'playlist' in url.lower():
+            print(f"Invalid YouTube URL detected (contains &, list=, or playlist): {url}")
+            return None
+            
         patterns = [
             r"(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([^&\n?#]+)",
             r"youtube\.com/watch\?.*v=([^&\n?#]+)",
@@ -16,35 +36,62 @@ class YouTubeTranscriptLoader:
         for pattern in patterns:
             match = re.search(pattern, url)
             if match:
-                return match.group(1)
+                video_id = match.group(1)
+                # Additional validation: video ID should be 11 characters
+                if len(video_id) == 11:
+                    return video_id
+                else:
+                    print(f"Invalid video ID length ({len(video_id)}): {video_id}")
+                    return None
         return None
 
     def get_video_info(self, video_url: str) -> Dict[str, Any]:
         """Get video info (and whether transcript is available)."""
         video_id = self.extract_video_id(video_url)
+        ext = 'txt'
         if not video_id:
             return {"valid": False, "error": "Invalid YouTube URL"}
 
         ydl_opts = {
             "skip_download": True, 
             "quiet": True,
-            "outtmpl": "/Users/home/Documents/aie8/02_Embeddings_and_RAG/aimakerspace/data/%(title)s.%(ext)s"
+            "socket_timeout": 10,  # 10 second timeout
+            "timeout": 10,         # 10 second timeout
+            "outtmpl": "/tmp/aimakerspace/data/%(video_id)s.%(ext)s"
         }
-        try:
+        def _extract_info():
+            print(f"🔧 Creating YouTubeDL instance with options: {ydl_opts}")
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                print(f"Calling extract_info for URL: {video_url}")
                 info = ydl.extract_info(video_url, download=False)
+                print(f"extract_info completed successfully")
+                
                 subtitles = info.get("subtitles", {})
                 auto_subs = info.get("automatic_captions", {})
                 available_langs = list(subtitles.keys()) + list(auto_subs.keys())
+                print(f"Found subtitles: {list(subtitles.keys())}")
+                print(f"Found auto_subs: {list(auto_subs.keys())}")
 
+                # Check if the requested language is available
+                has_requested_lang = self.language in subtitles or self.language in auto_subs
+                print(f"🔍 Requested language '{self.language}' available: {has_requested_lang}")
+                
                 return {
-                    "valid": True,
+                    "valid": has_requested_lang,
                     "video_id": video_id,
                     "video_url": video_url,
                     "language": self.language,
                     "available_languages": available_langs,
+                    "error": f"No transcripts available in {self.language}. Available languages: {available_langs}" if not has_requested_lang else None
                 }
+
+        try:
+            return self._run_with_timeout(_extract_info, timeout_seconds=30)
+        except TimeoutError as e:
+            print(f"get_video_info timed out: {str(e)}")
+            return {"valid": False, "video_id": video_id, "video_url": video_url, "error": f"Timeout: {str(e)}"}
         except Exception as e:
+            print(f"Exception in get_video_info: {str(e)}")
             return {"valid": False, "video_id": video_id, "video_url": video_url, "error": str(e)}
 
     def get_transcript(self, video_url: str, chunk_by_time: bool = True, chunk_duration: int = 60) -> List[Dict[str, Any]]:
@@ -60,15 +107,26 @@ class YouTubeTranscriptLoader:
             "subtitleslangs": [self.language],
             "subtitlesformat": "vtt",
             "quiet": True,
+            "socket_timeout": 30,  # 30 second timeout
+            "timeout": 30,         # 30 second timeout
         }
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(video_url, download=False)
-            subs = info.get("requested_subtitles", {})
-            if not subs:
-                raise Exception(f"No subtitles available for {video_id} in {self.language}")
+        def _get_transcript_info():
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(video_url, download=False)
+                subs = info.get("requested_subtitles", {})
+                if not subs:
+                    raise Exception(f"No subtitles available for {video_id} in {self.language}")
+                return subs[self.language]["url"]
 
-            url = subs[self.language]["url"]
+        try:
+            url = self._run_with_timeout(_get_transcript_info, timeout_seconds=30)
+        except TimeoutError as e:
+            print(f"get_transcript timed out: {str(e)}")
+            raise TimeoutError(f"Transcript extraction timed out: {str(e)}")
+        except Exception as e:
+            print(f"Exception in get_transcript: {str(e)}")
+            raise
 
         # Fetch and parse VTT manually
         import requests
@@ -96,7 +154,7 @@ class YouTubeTranscriptLoader:
                 "text": full_text,
                 "metadata": {
                     "source_type": "youtube",
-                    "source_name": f"video_{video_id}",
+                    "source_name": "YouTube",
                     "chunk_index": 0,
                     "chunk_length": len(full_text),
                     "timestamp": datetime.now().isoformat(),
@@ -119,7 +177,7 @@ class YouTubeTranscriptLoader:
                     "text": chunk_text,
                     "metadata": {
                         "source_type": "youtube",
-                        "source_name": f"video_{video_id}",
+                        "source_name": "YouTube",
                         "chunk_index": chunk_index,
                         "chunk_length": len(chunk_text),
                         "timestamp": datetime.now().isoformat(),
