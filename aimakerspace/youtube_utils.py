@@ -91,8 +91,18 @@ class YouTubeTranscriptLoader:
             print(f"get_video_info timed out: {str(e)}")
             return {"valid": False, "video_id": video_id, "video_url": video_url, "error": f"Timeout: {str(e)}"}
         except Exception as e:
-            print(f"Exception in get_video_info: {str(e)}")
-            return {"valid": False, "video_id": video_id, "video_url": video_url, "error": str(e)}
+            error_msg = str(e)
+            print(f"Exception in get_video_info: {error_msg}")
+            
+            # Handle common YouTube errors
+            if "bot" in error_msg.lower() or "captcha" in error_msg.lower() or "verify" in error_msg.lower():
+                return {"valid": False, "video_id": video_id, "video_url": video_url, "error": "YouTube detected automated access. Please try again later or use a different video."}
+            elif "private" in error_msg.lower() or "unavailable" in error_msg.lower():
+                return {"valid": False, "video_id": video_id, "video_url": video_url, "error": "Video is private or unavailable. Please check the URL and try again."}
+            elif "age" in error_msg.lower() or "restricted" in error_msg.lower():
+                return {"valid": False, "video_id": video_id, "video_url": video_url, "error": "Video is age-restricted or region-blocked. Cannot access transcript."}
+            else:
+                return {"valid": False, "video_id": video_id, "video_url": video_url, "error": f"YouTube access error: {error_msg}"}
 
     def get_transcript(self, video_url: str, chunk_by_time: bool = True, chunk_duration: int = 60) -> List[Dict[str, Any]]:
         """Fetch transcript using yt_dlp (falls back to auto captions)."""
@@ -125,8 +135,18 @@ class YouTubeTranscriptLoader:
             print(f"get_transcript timed out: {str(e)}")
             raise TimeoutError(f"Transcript extraction timed out: {str(e)}")
         except Exception as e:
-            print(f"Exception in get_transcript: {str(e)}")
-            raise
+            error_msg = str(e)
+            print(f"Exception in get_transcript: {error_msg}")
+            
+            # Handle common YouTube errors
+            if "bot" in error_msg.lower() or "captcha" in error_msg.lower() or "verify" in error_msg.lower():
+                raise Exception("YouTube detected automated access. Please try again later or use a different video.")
+            elif "private" in error_msg.lower() or "unavailable" in error_msg.lower():
+                raise Exception("Video is private or unavailable. Please check the URL and try again.")
+            elif "age" in error_msg.lower() or "restricted" in error_msg.lower():
+                raise Exception("Video is age-restricted or region-blocked. Cannot access transcript.")
+            else:
+                raise Exception(f"YouTube access error: {error_msg}")
 
         # Fetch and parse VTT manually
         import requests
