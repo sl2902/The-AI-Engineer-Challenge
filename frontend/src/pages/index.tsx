@@ -796,9 +796,11 @@ export default function Home() {
               <div className="pdf-upload-container">
                 <h3>Process YouTube Video</h3>
                 <p className="file-size-info">📺 Extract transcript from YouTube videos with subtitles</p>
-                <div className="youtube-disabled-notice">
-                  <p>⚠️ <strong>Note:</strong> YouTube processing is disabled on Vercel due to bot detection issues. This feature works locally.</p>
-                </div>
+                {typeof window !== 'undefined' && window.location.hostname.includes('vercel') && (
+                  <div className="youtube-disabled-notice">
+                    <p>⚠️ <strong>Note:</strong> YouTube processing is disabled on Vercel due to bot detection issues. This feature works locally.</p>
+                  </div>
+                )}
                 
                 {/* YouTube URL Input */}
                 <div className="youtube-input-container">
@@ -813,17 +815,18 @@ export default function Home() {
                       value={youtubeUrl}
                       onChange={(e) => setYoutubeUrl(e.target.value)}
                       placeholder="https://www.youtube.com/watch?v=..."
-                      disabled={true}
-                      style={{opacity: 0.5, cursor: 'not-allowed'}}
+                      disabled={typeof window !== 'undefined' && window.location.hostname.includes('vercel')}
+                      style={typeof window !== 'undefined' && window.location.hostname.includes('vercel') ? {opacity: 0.5, cursor: 'not-allowed'} : {}}
+                      title={typeof window !== 'undefined' && window.location.hostname.includes('vercel') ? "YouTube processing is disabled on Vercel" : ""}
                     />
                     {youtubeUrl && (
                       <button
                         type="button"
                         className="clear-button"
                         onClick={() => setYoutubeUrl("")}
-                        disabled={true}
+                        disabled={typeof window !== 'undefined' && window.location.hostname.includes('vercel')}
                         title="Clear URL"
-                        style={{opacity: 0.5, cursor: 'not-allowed'}}
+                        style={typeof window !== 'undefined' && window.location.hostname.includes('vercel') ? {opacity: 0.5, cursor: 'not-allowed'} : {}}
                       >
                         ✕
                       </button>
@@ -832,7 +835,7 @@ export default function Home() {
                 </div>
 
                 {/* YouTube Configuration */}
-                <div className="chunking-config" style={{opacity: 0.5, pointerEvents: 'none'}}>
+                <div className="chunking-config" style={typeof window !== 'undefined' && window.location.hostname.includes('vercel') ? {opacity: 0.5, pointerEvents: 'none'} : {}}>
                   <h4>Processing Configuration</h4>
                   <div className="config-row">
                     <div className="config-group">
@@ -841,7 +844,7 @@ export default function Home() {
                         id="youtube-language"
                         value={youtubeLanguage}
                         onChange={(e) => setYoutubeLanguage(e.target.value)}
-                        disabled={true}
+                        disabled={typeof window !== 'undefined' && window.location.hostname.includes('vercel')}
                       >
                         <option value="en">English</option>
                         <option value="es">Spanish</option>
@@ -865,7 +868,7 @@ export default function Home() {
                         step="30"
                         value={youtubeChunkDuration}
                         onChange={(e) => setYoutubeChunkDuration(parseInt(e.target.value))}
-                        disabled={true}
+                        disabled={typeof window !== 'undefined' && window.location.hostname.includes('vercel')}
                       />
                     </div>
                   </div>
@@ -875,12 +878,12 @@ export default function Home() {
                 <div className="button-group">
                   <button
                     onClick={handleYouTubeUpload}
-                    disabled={true}
+                    disabled={typeof window !== 'undefined' && window.location.hostname.includes('vercel')}
                     className={styles.button}
-                    style={{opacity: 0.5, cursor: 'not-allowed'}}
-                    title="YouTube processing is disabled on Vercel"
+                    style={typeof window !== 'undefined' && window.location.hostname.includes('vercel') ? {opacity: 0.5, cursor: 'not-allowed'} : {}}
+                    title={typeof window !== 'undefined' && window.location.hostname.includes('vercel') ? "YouTube processing is disabled on Vercel" : ""}
                   >
-                    📺 Process Video (Disabled on Vercel)
+                    {typeof window !== 'undefined' && window.location.hostname.includes('vercel') ? "📺 Process Video (Disabled on Vercel)" : "📺 Process Video"}
                   </button>
                   
                   {(youtubeStatus === "error" || youtubeStatus === "success") && (
@@ -888,8 +891,8 @@ export default function Home() {
                       onClick={handleYouTubeReset}
                       className="reset-button"
                       title="Reset and try again"
-                      disabled={true}
-                      style={{opacity: 0.5, cursor: 'not-allowed'}}
+                      disabled={typeof window !== 'undefined' && window.location.hostname.includes('vercel')}
+                      style={typeof window !== 'undefined' && window.location.hostname.includes('vercel') ? {opacity: 0.5, cursor: 'not-allowed'} : {}}
                     >
                       🔄 Reset
                     </button>
