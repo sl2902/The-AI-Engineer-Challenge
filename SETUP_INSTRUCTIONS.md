@@ -101,3 +101,4 @@ The frontend will be available at: http://localhost:3000
 - The application uses OpenAI embeddings for vector similarity search
 - All file uploads are processed server-side for security
 
+

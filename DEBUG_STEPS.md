@@ -43,3 +43,4 @@ Look for debug messages like:
 3. **API key missing** - Enter your OpenAI API key
 4. **Network error** - Check if both servers are running on correct ports
 
+
