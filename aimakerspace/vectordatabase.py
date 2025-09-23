@@ -125,6 +125,7 @@ class VectorDatabase:
         source_types = set()
         chunk_counts = {}
         total_chunks = len(self.metadata)
+        sample_metadata_by_source = {}
         
         for metadata in self.metadata.values():
             source = metadata.get("source", "unknown")
@@ -132,13 +133,18 @@ class VectorDatabase:
             source_type = metadata.get("source_type", "unkown")
             source_types.add(source_type)
             chunk_counts[source] = chunk_counts.get(source, 0) + 1
+            
+            # Store sample metadata for each source
+            if source not in sample_metadata_by_source:
+                sample_metadata_by_source[source] = metadata
         
         return {
             "total_chunks": total_chunks,
             "sources": list(sources),
             "source_types": list(source_types),
             "chunks_per_source": chunk_counts,
-            "sample_metadata": next(iter(self.metadata.values())) if self.metadata else {}
+            "sample_metadata": next(iter(self.metadata.values())) if self.metadata else {},
+            "sample_metadata_by_source": sample_metadata_by_source
         }
 
     def get_performance_stats(self) -> Dict[str, Any]:
